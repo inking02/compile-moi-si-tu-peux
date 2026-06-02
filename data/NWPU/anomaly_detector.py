@@ -40,31 +40,39 @@ def create_quantum_kernels(
         x = ParameterVector("x", n_qubits)
 
         qc = QuantumCircuit(n_qubits)
+        qc.h([i for i in range(n_qubits)])
+
+        for i in range(n_qubits):
+            for j in range(i + 1, n_qubits):
+                qc.cx(i, j)
 
         # -------------------------
         # 1. Angle encoding block
         # -------------------------
         for i in range(n_qubits):
-            qc.ry(x[i], i)
+            qc.h(i)
             qc.rz(x[i], i)
+            qc.ry(x[i], i)
 
         # -------------------------
         # 2. Entangling block (linear)
         # -------------------------
-        for i in range(n_qubits - 1):
-            qc.cx(i, i + 1)
+        for i in range(n_qubits):
+            for j in range(i + 1, n_qubits):
+                qc.cz(i, j)
 
         # -------------------------
         # 3. Second angle encoding
         # -------------------------
         for i in range(n_qubits):
-            qc.ry(2 * x[i], i)
-            qc.rz(2 * x[i], i)
+            qc.h(i)
+            qc.rz(x[i], i)
+            qc.ry(x[i], i)
 
-        return qc, x
+        return qc
 
     feature_map = build_feature_map(n_qubits=num_features)
-    kernel = FidelityQuantumKernel(feature_map=feature_map[0])
+    kernel = FidelityQuantumKernel(feature_map=feature_map)
     print("Building training kernel matrix...")
     K_train = kernel.evaluate(x_train, x_train)
     print("Building test kernel matrix...")
@@ -82,10 +90,10 @@ def create_and_train_classifier(K_train: np.ndarray) -> OneClassSVM:
 def detect_anomaly(
     ocsvm: OneClassSVM, K_test: np.ndarray, decision_percentile: float = 90
 ) -> tuple[list[float], list[int]]:
-    decision_scores = (-1) * ocsvm.decision_function(K_test)
+    decision_scores = ocsvm.decision_function(K_test)
     threshold = np.percentile(decision_scores, decision_percentile)
     preds = (decision_scores > threshold).astype(int)
-    return decision_scores, preds
+    return (-1) * decision_scores, preds
 
 
 ######################
