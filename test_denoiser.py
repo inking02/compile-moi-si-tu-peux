@@ -9,13 +9,13 @@ from torchmetrics.image import StructuralSimilarityIndexMeasure
 from data.NWPU.dataset_generator import create_anomaly_dataset
 
 from denoiser.noisy_filter import add_haze
-from denoiser.classical_denoiser import Denoiser
+from denoiser.classical_denoiser import Denoiser, FullDenoiser
 
 NOISY_OUTPUT_DIR = Path("denoiser/noisy_images")
 DENOISED_OUTPUT_DIR = Path("denoiser/denoised_images")
 MODEL_OUTPUT_PATH = Path("denoiser/denoiser_model.pt")
 BATCH_SIZE = 32
-EPOCHS = 10
+EPOCHS = 100
 LEARNING_RATE = 1e-3
 
 
@@ -157,13 +157,29 @@ noisy_train_images = torch.stack([add_haze(image) for image in clean_train_image
 noisy_test_images = torch.stack([add_haze(image) for image in clean_test_images])
 
 save_image_references(
+    clean_train_images,
+    train_anomaly_labels,
+    train_photo_type_labels,
+    "train",
+    output_dir=Path("denoiser/original_images"),
+)
+
+save_image_references(
+    clean_test_images,
+    test_anomaly_labels,
+    test_photo_type_labels,
+    "test",
+    output_dir=Path("denoiser/original_images"),
+)
+
+save_image_references(
     noisy_train_images, train_anomaly_labels, train_photo_type_labels, "train"
 )
 save_image_references(
     noisy_test_images, test_anomaly_labels, test_photo_type_labels, "test"
 )
 
-denoiser = Denoiser(image_size=32, RGB=True)
+denoiser = FullDenoiser()
 denoiser = train_denoiser(
     denoiser,
     noisy_images=noisy_train_images,
@@ -228,6 +244,36 @@ noisy_test_loss, noisy_test_psnr, noisy_test_ssim = evaluate_reconstruction(
 )
 psnr_improvement = test_psnr - noisy_test_psnr
 ssim_improvement = test_ssim - noisy_test_ssim
+
+
+results = {
+    "train": {
+        "loss": train_loss,
+        "psnr": train_psnr,
+        "ssim": train_ssim,
+    },
+    "test": {
+        "loss": test_loss,
+        "psnr": test_psnr,
+        "ssim": test_ssim,
+    },
+    "noisy_test": {
+        "loss": noisy_test_loss,
+        "psnr": noisy_test_psnr,
+        "ssim": noisy_test_ssim,
+    },
+    "improvement": {
+        "psnr_gain": psnr_improvement,
+        "ssim_gain": ssim_improvement,
+    },
+}
+
+print("\n========== DENOISER SUMMARY ==========")
+for split, metrics in results.items():
+    print(f"\n[{split.upper()}]")
+    for k, v in metrics.items():
+        print(f"{k:>12}: {v:.4f}")
+
 
 print(f"Clean train images: {tuple(clean_train_images.shape)}")
 print(f"Noisy train images: {tuple(noisy_train_images.shape)}")
