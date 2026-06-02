@@ -165,9 +165,10 @@ y_test_t = torch.tensor(y_test, dtype=torch.long)
 # Model, loss, optimizer
 # -----------------------
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(
-    list(model.encoder.parameters()) + list(model.classifier.parameters()), lr=1e-3
-)
+# optimizer = optim.Adam(
+#    list(model.encoder.parameters()) + list(model.classifier.parameters()), lr=1e-3
+# )
+optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
 epochs = 100
 batch_size = 16
