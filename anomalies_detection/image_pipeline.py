@@ -1,9 +1,9 @@
 """
-Image feature pipeline for the QSVM classifier.
+File: image_pipeline.py
 
-This module converts images to numeric feature vectors, builds labeled datasets
-from class folders, then reduces and scales image vectors to angle values for
-angle-based quantum embeddings.
+Description: This module converts images to numeric feature vectors, builds
+labeled datasets from class folders or NWPU tensors, and reduces/scales image
+vectors to angle values for quantum embeddings.
 """
 
 from pathlib import Path
@@ -23,7 +23,20 @@ IMAGENET_STD = np.array((0.229, 0.224, 0.225), dtype=np.float64)
 
 
 def find_images(image_dir, recursive=False):
-    """Returns sorted supported image paths for a directory."""
+    """
+    Returns sorted supported image paths for a directory.
+
+    Args:
+        image_dir (str or Path): Directory to scan.
+        recursive (bool): Whether to scan nested directories.
+
+    Returns:
+        list[Path]: Sorted supported image paths.
+
+    Raises:
+        FileNotFoundError: If the image directory does not exist.
+        ValueError: If ``image_dir`` is not a directory.
+    """
     directory = Path(image_dir)
     if not directory.exists():
         raise FileNotFoundError(f"Image directory not found: {directory}")
@@ -40,12 +53,20 @@ def find_images(image_dir, recursive=False):
 
 def extract_image_features(image_path, image_size=(32, 32), histogram_bins=8):
     """
-    Converts one image to a numeric visual feature vector.
+    Converts one image file to a numeric visual feature vector.
 
     The features are intentionally lightweight and local: color statistics,
     color histograms, simple edge/texture strength, and a tiny grayscale
     thumbnail. This avoids external model downloads while giving the QSVM
     structured image information.
+
+    Args:
+        image_path (str or Path): Image file to process.
+        image_size (tuple[int, int]): Resized image dimensions.
+        histogram_bins (int): Number of bins used for color histograms.
+
+    Returns:
+        np.ndarray: Numeric visual feature vector.
     """
     image = Image.open(image_path).convert("RGB")
     image = image.resize(image_size, Image.Resampling.BILINEAR)
@@ -58,6 +79,17 @@ def extract_tensor_image_features(image_tensor, histogram_bins=8):
     Converts one image tensor shaped (3, H, W) or (H, W, 3) to features.
 
     The tensor is expected to contain unnormalized RGB values in [0, 1].
+
+    Args:
+        image_tensor: Image tensor or array shaped ``(3, H, W)`` or
+            ``(H, W, 3)``.
+        histogram_bins (int): Number of bins used for color histograms.
+
+    Returns:
+        np.ndarray: Numeric visual feature vector.
+
+    Raises:
+        ValueError: If the image tensor is not a supported RGB shape.
     """
     if isinstance(image_tensor, torch.Tensor):
         image = image_tensor.detach().cpu().numpy()
@@ -79,7 +111,16 @@ def extract_tensor_image_features(image_tensor, histogram_bins=8):
 
 
 def extract_rgb_features(rgb, histogram_bins=8):
-    """Converts an RGB array in [0, 1] to the shared feature vector."""
+    """
+    Converts an RGB array in ``[0, 1]`` to the shared feature vector.
+
+    Args:
+        rgb (np.ndarray): RGB image array shaped ``(H, W, 3)``.
+        histogram_bins (int): Number of bins used for color histograms.
+
+    Returns:
+        np.ndarray: Numeric visual feature vector.
+    """
     gray = (
         0.299 * rgb[:, :, 0]
         + 0.587 * rgb[:, :, 1]
@@ -161,10 +202,15 @@ def build_image_class_dataset(
 
     Args:
         class_dirs: Mapping of class directory path to numeric label.
+        image_size (tuple[int, int]): Resized image dimensions.
+        histogram_bins (int): Number of bins used for color histograms.
         max_images_per_class: Optional cap to keep QSVM kernel computation small.
 
     Returns:
         (X, y, image_paths) where X is a torch tensor of image feature vectors.
+
+    Raises:
+        ValueError: If a class directory has no supported images.
     """
     vectors = []
     labels = []
@@ -208,11 +254,18 @@ def build_target_detection_dataset(
     Args:
         data_split_root: Directory containing class folders, e.g. data/train/train.
         target_classes: Class folder names considered positive.
+        image_size (tuple[int, int]): Resized image dimensions.
+        histogram_bins (int): Number of bins used for color histograms.
         max_positive_per_class: Optional cap per target class.
         max_negative_total: Optional cap across all non-target classes.
+        random_state (int): Random seed used when sampling negative images.
 
     Returns:
         (X, y, image_paths) where y is 1 for target and 0 for other.
+
+    Raises:
+        FileNotFoundError: If the data split directory is missing.
+        ValueError: If positive or negative images cannot be found.
     """
     root = Path(data_split_root)
     if not root.exists():
@@ -273,6 +326,14 @@ def build_nwpu_detection_datasets(
     The NWPU generator returns image tensors and anomaly labels. This function
     converts those tensors to the same handcrafted image features used by the
     rest of the QSVM pipeline.
+
+    Args:
+        data_dir (str or Path): Directory containing ``dataset_generator.py``.
+        histogram_bins (int): Number of bins used for color histograms.
+
+    Returns:
+        tuple: Train features, train labels, train names, test features, test
+        labels, and test names.
     """
     generator = _load_nwpu_generator(data_dir)
     train, test = generator.create_anomaly_dataset()
@@ -285,6 +346,18 @@ def build_nwpu_detection_datasets(
 
 
 def _load_nwpu_generator(data_dir):
+    """
+    Loads the NWPU dataset generator module from a data directory.
+
+    Args:
+        data_dir (str or Path): Directory containing ``dataset_generator.py``.
+
+    Returns:
+        module: Imported NWPU dataset generator module.
+
+    Raises:
+        FileNotFoundError: If the generator file is missing.
+    """
     generator_path = Path(data_dir) / "dataset_generator.py"
     if not generator_path.exists():
         raise FileNotFoundError(f"Missing NWPU dataset generator: {generator_path}")
@@ -296,6 +369,17 @@ def _load_nwpu_generator(data_dir):
 
 
 def _features_from_nwpu_split(split, histogram_bins=8):
+    """
+    Converts an NWPU tensor split to handcrafted image features.
+
+    Args:
+        split (tuple): NWPU split containing images, anomaly labels, and
+            photo-type labels.
+        histogram_bins (int): Number of bins used for color histograms.
+
+    Returns:
+        tuple[torch.Tensor, torch.Tensor]: Feature tensor and anomaly labels.
+    """
     images, anomaly_labels, _photo_type_labels = split
     vectors = [
         extract_tensor_image_features(image, histogram_bins=histogram_bins)
@@ -316,6 +400,15 @@ class ImageAngleTransformer:
     """
 
     def __init__(self, output_dim=16):
+        """
+        Initializes the PCA-based angle transformer.
+
+        Args:
+            output_dim (int): Number of output angle dimensions.
+
+        Raises:
+            ValueError: If ``output_dim`` is less than 1.
+        """
         if output_dim < 1:
             raise ValueError("output_dim must be at least 1.")
 
@@ -325,6 +418,18 @@ class ImageAngleTransformer:
         self.angle_scaler = MinMaxScaler(feature_range=(0.0, np.pi))
 
     def fit(self, X):
+        """
+        Fits the standardizer, PCA reducer, and angle scaler.
+
+        Args:
+            X: Image feature matrix.
+
+        Returns:
+            ImageAngleTransformer: This fitted transformer.
+
+        Raises:
+            ValueError: If there are not enough samples/features for output_dim.
+        """
         X_numpy = _to_numpy(X)
         X_scaled = self.standardizer.fit_transform(X_numpy)
         n_components = min(self.output_dim, X_scaled.shape[0], X_scaled.shape[1])
@@ -340,6 +445,18 @@ class ImageAngleTransformer:
         return self
 
     def transform(self, X):
+        """
+        Transforms image feature vectors into angle values.
+
+        Args:
+            X: Image feature matrix.
+
+        Returns:
+            torch.Tensor: Angle matrix with values in ``[0, pi]``.
+
+        Raises:
+            ValueError: If the transformer has not been fitted.
+        """
         if self.pca is None:
             raise ValueError("ImageAngleTransformer must be fitted before transform().")
 
@@ -350,10 +467,28 @@ class ImageAngleTransformer:
         return torch.as_tensor(angles, dtype=torch.float64)
 
     def fit_transform(self, X):
+        """
+        Fits the transformer and returns transformed angle values.
+
+        Args:
+            X: Image feature matrix.
+
+        Returns:
+            torch.Tensor: Angle matrix with values in ``[0, pi]``.
+        """
         return self.fit(X).transform(X)
 
 
 def _to_numpy(values):
+    """
+    Converts torch, pandas, or array-like values to a NumPy array.
+
+    Args:
+        values: Values to convert.
+
+    Returns:
+        np.ndarray: Converted NumPy array.
+    """
     if isinstance(values, torch.Tensor):
         return values.detach().cpu().numpy()
     if hasattr(values, "to_numpy"):

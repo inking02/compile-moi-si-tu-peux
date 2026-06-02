@@ -10,12 +10,14 @@ import torch
 
 
 SUSPICIOUS_EVENT_LABELS = {
-    0: "pas_anomalie",
-    1: "anomalie",
+    0: "No anomaly",
+    1: "Anomaly",
 }
 
 
 class Embedding(Enum):
+    """Supported quantum embedding strategies for anomaly detection models."""
+
     AMPLITUDE = "amplitude"
     ANGLE_X = "X"
     ANGLE_Y = "Y"
@@ -52,7 +54,15 @@ def prepare_visual_features(features, target_size=None, normalize=True) -> torch
 
 
 def normalize_feature_rows(features) -> torch.Tensor:
-    """L2-normalizes each row while keeping all-zero rows unchanged."""
+    """
+    L2-normalizes each row while keeping all-zero rows unchanged.
+
+    Args:
+        features: Array-like feature matrix.
+
+    Returns:
+        torch.Tensor: Row-normalized feature matrix.
+    """
     X = _to_tensor(features)
     norms = torch.linalg.norm(X, dim=1, keepdim=True)
     norms = torch.where(norms == 0, torch.ones_like(norms), norms)
@@ -62,6 +72,16 @@ def normalize_feature_rows(features) -> torch.Tensor:
 def pad_features_to_power_of_two(features, target_size=None) -> torch.Tensor:
     """
     Pads feature vectors so their length is compatible with AmplitudeEmbedding.
+
+    Args:
+        features: Array-like feature matrix.
+        target_size (int or None): Optional final feature count.
+
+    Returns:
+        torch.Tensor: Padded feature matrix.
+
+    Raises:
+        ValueError: If ``target_size`` is too small or is not a power of two.
     """
     X = _to_tensor(features)
     if X.ndim == 1:
@@ -103,7 +123,15 @@ def filter_detection_results(results, tolerance=None):
 
 
 def _to_tensor(values) -> torch.Tensor:
-    """Converts pandas objects, NumPy arrays, and array-like values to torch tensors."""
+    """
+    Converts pandas objects, NumPy arrays, and array-like values to tensors.
+
+    Args:
+        values: Values to convert.
+
+    Returns:
+        torch.Tensor: Converted float64 tensor.
+    """
     if isinstance(values, torch.Tensor):
         return values.detach().to(dtype=torch.float64)
     if hasattr(values, "to_numpy"):
@@ -112,6 +140,15 @@ def _to_tensor(values) -> torch.Tensor:
 
 
 def _to_numpy(values):
+    """
+    Converts torch, pandas, or array-like values to a NumPy array.
+
+    Args:
+        values: Values to convert.
+
+    Returns:
+        np.ndarray: Converted NumPy array.
+    """
     if isinstance(values, torch.Tensor):
         return values.detach().cpu().numpy()
     if hasattr(values, "to_numpy"):
@@ -120,6 +157,15 @@ def _to_numpy(values):
 
 
 def _next_power_of_two(value) -> int:
+    """
+    Computes the smallest power of two greater than or equal to a value.
+
+    Args:
+        value (int): Input value.
+
+    Returns:
+        int: Smallest power of two greater than or equal to ``value``.
+    """
     power = 1
     while power < value:
         power *= 2
@@ -127,6 +173,15 @@ def _next_power_of_two(value) -> int:
 
 
 def _is_power_of_two(value) -> bool:
+    """
+    Checks whether a value is a positive power of two.
+
+    Args:
+        value (int): Input value.
+
+    Returns:
+        bool: True if ``value`` is a power of two, otherwise False.
+    """
     if value < 1:
         return False
 

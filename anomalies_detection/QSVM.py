@@ -50,6 +50,12 @@ class QsvmModel:
     """
 
     def __init__(self, config=None) -> None:
+        """
+        Initializes a QSVM model with optional configuration overrides.
+
+        Args:
+            config (dict or None): Optional model configuration.
+        """
         self.svm = SVC(kernel='precomputed', probability=True)  # Initialize SVM with a precomputed kernel
         self.embedding_type = Embedding.IMAGE_REUPLOAD  # Default embedding type
         self.embedding_reps = 2
@@ -218,6 +224,19 @@ class QsvmModel:
         return Statevector.from_instruction(circuit)
 
     def _embedding_circuit(self, x):
+        """
+        Builds the embedding circuit for one feature vector.
+
+        Args:
+            x (torch.Tensor): Feature vector to encode.
+
+        Returns:
+            QuantumCircuit: Circuit containing the selected embedding.
+
+        Raises:
+            ValueError: If an embedding type is unsupported or cannot encode the
+            provided vector.
+        """
         circuit = QuantumCircuit(self.num_qubits)
 
         if self.embedding_type == Embedding.AMPLITUDE:
@@ -237,6 +256,13 @@ class QsvmModel:
         return circuit
 
     def _apply_angle_embedding(self, circuit, x):
+        """
+        Applies single-qubit angle embedding to a circuit.
+
+        Args:
+            circuit (QuantumCircuit): Circuit to modify in place.
+            x (torch.Tensor): Feature values used as rotation angles.
+        """
         for qubit, value in enumerate(x):
             angle = float(value.item())
             if self.embedding_type == Embedding.ANGLE_X:
@@ -274,6 +300,16 @@ class QsvmModel:
                     )
 
     def _apply_zz_phase(self, circuit, control_qubit, target_qubit, x1, x2):
+        """
+        Applies a ZZ-style phase interaction between two qubits.
+
+        Args:
+            circuit (QuantumCircuit): Circuit to modify in place.
+            control_qubit (int): Control qubit index.
+            target_qubit (int): Target qubit index.
+            x1 (float): First feature value.
+            x2 (float): Second feature value.
+        """
         circuit.cx(control_qubit, target_qubit)
         circuit.rz((np.pi - x1) * (np.pi - x2) / np.pi, target_qubit)
         circuit.cx(control_qubit, target_qubit)
@@ -343,6 +379,15 @@ class QsvmModel:
             self.num_qubits = X_train.shape[1]
 
     def _to_feature_tensor(self, values) -> torch.Tensor:
+        """
+        Converts feature values to a detached float64 torch tensor.
+
+        Args:
+            values: Tensor, pandas object, NumPy array, or array-like values.
+
+        Returns:
+            torch.Tensor: Converted feature tensor.
+        """
         if isinstance(values, torch.Tensor):
             return values.detach().to(dtype=torch.float64)
         if hasattr(values, "to_numpy"):
@@ -350,6 +395,15 @@ class QsvmModel:
         return torch.as_tensor(values, dtype=torch.float64)
 
     def _to_numpy(self, values):
+        """
+        Converts tensor, pandas, or array-like values to a NumPy array.
+
+        Args:
+            values: Values to convert.
+
+        Returns:
+            np.ndarray: Converted NumPy array.
+        """
         if isinstance(values, torch.Tensor):
             return values.detach().cpu().numpy()
         if hasattr(values, "to_numpy"):

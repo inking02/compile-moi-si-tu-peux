@@ -1,8 +1,8 @@
 """
-Small smoke test for the Qiskit QSVM anomaly classifier.
+File: test_qsvm.py
 
-Run from the repository root:
-    python3 iqucodefest-2026-docs/Classification/test_qsvm.py
+Description: This script runs a small smoke test for the Qiskit QSVM anomaly
+classifier using toy feature vectors and binary anomaly labels.
 """
 
 import torch
@@ -12,6 +12,7 @@ from utils import normalize_feature_rows
 
 
 def main():
+    """Runs the QSVM smoke test and prints toy predictions."""
     # Fake photo features. Each row represents one photo embedding.
     # Class 0 means no anomaly. Class 1 means anomaly.
     raw_train_features = torch.tensor([

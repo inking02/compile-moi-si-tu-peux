@@ -1,11 +1,9 @@
 """
-Train a binary QSVM detector for target images.
+File: train_target_detector.py
 
-Default positive classes:
-    airplane, airport, harbor, ship
-
-Run from this directory:
-    python3 train_target_detector.py
+Description: This script trains and evaluates a binary QSVM detector for NWPU
+target images, using airplane, airport, harbor, and ship as default positive
+classes.
 """
 
 import argparse
@@ -17,12 +15,13 @@ from QSVM import QsvmModel
 from image_pipeline import ImageAngleTransformer
 from image_pipeline import build_nwpu_detection_datasets
 LABEL_NAMES = {
-    0: "autre",
-    1: "cible",
+    0: "No anomaly",
+    1: "Anomaly",
 }
 
 
 def main():
+    """Runs the target-detector training and evaluation workflow."""
     args = _parse_args()
 
     X_train, y_train, _, X_test, y_test, test_names = build_nwpu_detection_datasets(
@@ -85,14 +84,21 @@ def main():
 
     print("\nSample predictions:")
     for name, result in zip(test_names[:args.show_predictions], results[:args.show_predictions]):
-        anomaly_score = result["scores"]["cible"]
-        status = "ANOMALIE DETECTEE" if anomaly_score >= threshold else "RIEN"
+        anomaly_score = result["scores"]["Anomaly"]
+        status = "ANOMALY DETECTED" if anomaly_score >= threshold else "NORMAL"
         print(
-            f"{name}: {status} | score_anomalie={anomaly_score:.2f}"
+            f"{name}: {status} | score_anomaly={anomaly_score:.2f}"
         )
 
 
 def _print_detection_summary(expected, predicted):
+    """
+    Prints binary detection counts and rates.
+
+    Args:
+        expected (np.ndarray): Ground-truth binary labels.
+        predicted (np.ndarray): Predicted binary labels.
+    """
     true_positive = int(((expected == 1) & (predicted == 1)).sum())
     false_positive = int(((expected == 0) & (predicted == 1)).sum())
     true_negative = int(((expected == 0) & (predicted == 0)).sum())
@@ -105,11 +111,11 @@ def _print_detection_summary(expected, predicted):
 
     print("Resultats de detection:")
     print(
-        f"  Anomalies detectees : {true_positive}/{total_anomalies} "
+        f"  Anomalies detected : {true_positive}/{total_anomalies} "
         f"({anomaly_detection_rate * 100:.0f}%)"
     )
     print(
-        f"  Rien detecte        : {true_negative}/{total_normal} "
+        f"  Normal              : {true_negative}/{total_normal} "
         f"({normal_ignore_rate * 100:.0f}%)"
     )
     print(f"  Anomalies manquees  : {false_negative}")
@@ -117,7 +123,17 @@ def _print_detection_summary(expected, predicted):
 
 
 def _best_threshold(expected, train_results):
-    scores = np.array([result["scores"]["cible"] for result in train_results])
+    """
+    Finds the threshold with the best balanced train-set detection score.
+
+    Args:
+        expected (np.ndarray): Ground-truth binary train labels.
+        train_results (list[dict]): Prediction dictionaries with anomaly scores.
+
+    Returns:
+        float: Best threshold found among train anomaly scores.
+    """
+    scores = np.array([result["scores"]["Anomaly"] for result in train_results])
     candidates = np.unique(np.round(scores, 4))
     best_threshold = 0.5
     best_score = -1.0
@@ -140,12 +156,27 @@ def _best_threshold(expected, train_results):
 
 
 def _class_weight(value):
+    """
+    Converts CLI class-weight input to the value expected by scikit-learn.
+
+    Args:
+        value (str): Class-weight option from the command line.
+
+    Returns:
+        str or None: ``None`` for ``"none"``, otherwise the original value.
+    """
     if value == "none":
         return None
     return value
 
 
 def _parse_args():
+    """
+    Parses command-line arguments for target-detector training.
+
+    Returns:
+        argparse.Namespace: Parsed command-line arguments.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-root", default="../data/NWPU")
     parser.add_argument("--output-dim", type=int, default=16)

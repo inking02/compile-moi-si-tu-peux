@@ -1,3 +1,10 @@
+"""
+File: trainer.py
+
+Description: This script experiments with a CNN encoder, Merlin quantum
+reservoir, and classical classifier head for NWPU image classification.
+"""
+
 from qiskit_algorithms.optimizers import COBYLA, ADAM
 from qiskit_machine_learning.neural_networks import SamplerQNN
 import numpy as np
@@ -15,44 +22,6 @@ import time
 SEED = 8398
 
 nb_features = 16
-
-"""
-optimizer = ADAM(maxiter=num_iter)
-
-np.random.seed(SEED)
-
-ansatz = EfficientSU2(
-    num_qubits=nb_features,
-    su2_gates=["ry", "rz"],
-    entanglement="circular",
-    reps=2
-    )
-
-emb_circuit = ZZFeatureMap(nb_features, reps=1, entanglement="circular")
-
-qc = QuantumCircuit(nb_features)
-
-qc.compose(emb_circuit, inplace=True)
-qc.compose(ansatz, inplace=True)
-
-
-def interpret(x):
-    return x % 4
-
-qnn=SamplerQNN(
-    circuit=qc,  
-    input_params=emb_circuit.parameters,
-    weight_params=ansatz.parameters,
-    interpret = interpret,
-    output_shape=4  # Reshape by the number of classical registers
-)
-
-
-
-initial_weights = np.random.rand(ansatz.num_parameters) 
-
-circuit_classifier = NeuralNetworkClassifier(neural_network=qnn,optimizer=optimizer,initial_point=initial_weights)
-"""
 
 # Experiment Parameters
 
@@ -92,6 +61,8 @@ import torch.optim as optim
 
 
 class CNNEncoder(nn.Module):
+    """Convolutional encoder that maps RGB images to latent features."""
+
     def __init__(self):
         super().__init__()
 
@@ -109,6 +80,15 @@ class CNNEncoder(nn.Module):
         )
 
     def forward(self, x):
+        """
+        Encodes an image batch into latent features.
+
+        Args:
+            x (torch.Tensor): RGB image batch.
+
+        Returns:
+            torch.Tensor: Latent feature tensor.
+        """
         return self.net(x)
 
 
@@ -126,6 +106,8 @@ reservoir = ml.QuantumLayer(input_size=10, builder=builder, n_photons=5)
 
 
 class QuantumReservoirNet(nn.Module):
+    """CNN and quantum-reservoir classifier for NWPU image labels."""
+
     def __init__(self):
         super().__init__()
 
@@ -138,6 +120,15 @@ class QuantumReservoirNet(nn.Module):
         )
 
     def forward(self, x):
+        """
+        Computes class logits for an image batch.
+
+        Args:
+            x (torch.Tensor): RGB image batch.
+
+        Returns:
+            torch.Tensor: Class logits.
+        """
         x = self.encoder(x)
 
         x = torch.tanh(x)
@@ -175,6 +166,17 @@ batch_size = 16
 
 
 def accuracy(model, x, y):
+    """
+    Computes classification accuracy for a model and dataset tensors.
+
+    Args:
+        model (torch.nn.Module): Model to evaluate.
+        x (torch.Tensor): Input image batch.
+        y (torch.Tensor): Ground-truth class labels.
+
+    Returns:
+        float: Accuracy in the range ``[0, 1]``.
+    """
     model.eval()
     with torch.no_grad():
         logits = model(x)
