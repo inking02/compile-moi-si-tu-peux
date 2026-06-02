@@ -1,4 +1,3 @@
-
 """
 File: trainer.py
 
@@ -18,9 +17,7 @@ import torch.nn as nn
 import torch
 import torch.optim as optim
 
-
 nb_features = 16
-
 
 
 def get_datas(num_data: int, anomaly_ratio: float):
@@ -34,23 +31,6 @@ def get_datas(num_data: int, anomaly_ratio: float):
     y_test = tensor[1][2].detach().numpy()
 
     return x_train, y_train, x_test, y_test
-
-
-
-
-
-def rafine_y_values(y_train, y_test):
-
-    unique = np.unique(y_train)
-    label_map = {old: new for new, old in enumerate(unique)}
-    y_train = np.vectorize(label_map.get)(y_train)
-    y_test = np.vectorize(label_map.get)(y_test)
-
-    return y_train, y_test
-
-
-
-
 
 
 class CNNEncoder(nn.Module):
@@ -85,8 +65,6 @@ class CNNEncoder(nn.Module):
         return self.net(x)
 
 
-
-
 def create_reservoir(n_modes: int, n_photons: int) -> ml.QuantumLayer:
 
     builder = ml.CircuitBuilder(n_modes=11)
@@ -102,7 +80,6 @@ def create_reservoir(n_modes: int, n_photons: int) -> ml.QuantumLayer:
     reservoir = ml.QuantumLayer(input_size=10, builder=builder, n_photons=5)
 
     return reservoir
-
 
 
 class QuantumReservoirNet(nn.Module):
@@ -143,9 +120,6 @@ class QuantumReservoirNet(nn.Module):
 anomaly_ratio = 1
 
 x_train, y_train, x_test, y_test = get_datas(400, anomaly_ratio)
-
-# Refine y values to be between 0 and nb_classes-1
-y_train, y_test = rafine_y_values(y_train, y_test)
 
 # Convert to PyTorch tensors
 x_train_t = torch.tensor(x_train, dtype=torch.float32)
@@ -200,7 +174,7 @@ def train(
     epochs: int = 100,
     batch_size: int = 16,
 ):
-    
+
     model.train()
     n = x_train_t.shape[0]
 
@@ -229,6 +203,7 @@ def train(
 
     return model
 
+
 model = train(
     model,
     x_train_t,
@@ -240,6 +215,7 @@ model = train(
     epochs=epochs,
     batch_size=batch_size,
 )
+
 
 # -----------------------
 # Final evaluation
