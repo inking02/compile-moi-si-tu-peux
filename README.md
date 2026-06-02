@@ -11,13 +11,14 @@ defense applications.
 
 ## Overview
 
-The project pipeline follows three main steps:
+The main workflow is implemented in `data/NWPU` and follows a two-stage
+classification pipeline.
 
-- `data/NWPU`: loads the dataset and generates anomaly labels.
-- `denoiser`: simulates haze and optionally applies convolutional denoising.
-- `anomalies_detection`: performs QSVM-based anomaly detection and classification.
+First, the system decides whether an image is normal or anomalous. It uses a
+ResNet18 feature extractor, reduces the feature space with PCA to 10
+components, and applies a One-Class QSVM to separate normal samples from
+potential anomalies.
 
-In short, the system takes a potentially degraded aerial image, optionally
-denoises it, extracts visual features, and runs two classification stages: one
-to detect whether an anomaly is present, and another to identify the anomaly
-type.
+Second, when an anomaly is detected, the system classifies the precise anomaly
+type. This stage uses a classical convolutional network, a boson sampler layer,
+a non-linearity, and a final linear layer to predict the anomaly class.
