@@ -98,7 +98,7 @@ def create_nwpu_tensors(
     data_dir: str | Path = DATA_DIR,
     num_samples: int = 500,
     ratio_anomaly: float = 0.1,
-    image_size: int = 224,
+    image_size: int = 32,
     normalize: bool = True,
     seed: int | None = 0,
 ) -> tuple[
@@ -168,7 +168,7 @@ def create_nwpu_tensors(
 def create_anomaly_dataset(
     ratio_anomaly: float = 0.1,
     num_samples: int = 500,
-    image_size: int = 224,
+    image_size: int = 32,
     normalize: bool = True,
     seed: int | None = 0,
 ) -> tuple[
