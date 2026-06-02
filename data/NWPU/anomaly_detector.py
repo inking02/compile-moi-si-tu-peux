@@ -93,7 +93,7 @@ def detect_anomaly(
     decision_scores = ocsvm.decision_function(K_test)
     threshold = np.percentile(decision_scores, decision_percentile)
     preds = (decision_scores > threshold).astype(int)
-    return (-1) * decision_scores, preds
+    return decision_scores, preds
 
 
 ######################
