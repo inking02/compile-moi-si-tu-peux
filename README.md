@@ -22,3 +22,10 @@ potential anomalies. This model is trained with a dataset with only "normal" dat
 Then, when an anomaly is detected, the system classifies the precise anomaly
 type. This stage uses a classical convolution network, a boson sampler layer that generates non-linearity, and a final linear layer to predict the anomaly class. This model is trained with only anomalies features.
 
+
+## To run
+To run the solution, please create a new environment and download the dependencies with this command.
+```
+pip install -r requirements.txt
+```
+
