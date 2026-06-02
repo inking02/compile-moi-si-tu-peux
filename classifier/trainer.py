@@ -1,7 +1,6 @@
 from qiskit_algorithms.optimizers import COBYLA,ADAM
 from qiskit_machine_learning.neural_networks import SamplerQNN
 import numpy as np
-from classifier import create_classifier_circuit
 
 from qiskit import QuantumCircuit
 from qiskit_machine_learning.algorithms.classifiers import NeuralNetworkClassifier
