@@ -24,7 +24,7 @@ type. This stage uses a classical convolution network, a boson sampler layer tha
 
 
 ## To run
-To run the solution, please create a new environment and download the dependencies with this command.
+To run the solution, please create a new environment and download the dependencies with this command. **Note that the code should be run with python version 3.12.0.**
 ```
 pip install -r requirements.txt
 ```
