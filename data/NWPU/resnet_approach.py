@@ -4,6 +4,7 @@ from sklearn.decomposition import PCA
 from sklearn.metrics import roc_auc_score
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
+import torch.nn as nn
 
 from dataset_generator import create_anomaly_dataset
 import torch.nn.functional as F
@@ -23,7 +24,6 @@ y_test = test_tensor[1][1]
 # ====================================================
 # Feature extractor
 # ====================================================
-
 resnet = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
 
 # Remove classifier
@@ -53,25 +53,45 @@ def compactness_loss(z):
 
 
 epochs = 20
-
 for epoch in range(epochs):
-    total_loss = 0.0
+
+    with torch.no_grad():
+        train_features = F.normalize(resnet(x_train), dim=1)
+        center = train_features.mean(dim=0)
+        center = F.normalize(center, dim=0)
 
     for (x,) in train_loader:
-        x = x.float()
-
-        optimizer.zero_grad()
-
         z = F.normalize(resnet(x), dim=1)
 
         loss = ((z - center) ** 2).mean()
 
+        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-        total_loss += loss.item()
+    print(f"Epoch {epoch}: loss = {loss.item():.4f}")
 
-    print(f"Epoch {epoch}: loss = {total_loss:.4f}")
+
+with torch.no_grad():
+    train_features = F.normalize(resnet(x_train), dim=1)
+
+train_distances = torch.norm(train_features - center, dim=1).cpu().numpy()
+
+print(train_distances.mean())
+print(train_distances.std())
+print(train_distances.min(), train_distances.max())
+
+
+with torch.no_grad():
+    test_features = F.normalize(resnet(x_test), dim=1)
+
+test_distances = torch.norm(test_features - center, dim=1).cpu().numpy()
+
+normal_scores = test_distances[y_test == 0]
+anomaly_scores = test_distances[y_test == 1]
+
+print("Normal mean:", normal_scores.mean())
+print("Anomaly mean:", anomaly_scores.mean())
 
 resnet.eval()
 for param in resnet.parameters():
