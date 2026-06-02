@@ -1,8 +1,8 @@
-from utils import encode_feature_vector_to_angles, apply_angle_encoding
+from utils import encode_feature_vector_to_angles, angle_embedding
 from qiskit import QuantumCircuit
 import numpy as np
 from qiskit.circuit.library import EfficientSU2
-
+from qiskit_aer import AerSimulator
 
 
 def create_classifier_circuit(feature_vector: np.ndarray) -> QuantumCircuit:
@@ -10,21 +10,16 @@ def create_classifier_circuit(feature_vector: np.ndarray) -> QuantumCircuit:
     Create a quantum circuit that encodes the given feature vector using angle encoding.
     The number of qubits is determined by the length of the feature vector.
     """
-    n_features = len(feature_vector)
-    if n_features == 0:
-        raise ValueError("Feature vector cannot be empty.")
-    
+
     # Encode feature vector to angles
     angles = encode_feature_vector_to_angles(feature_vector)
-    
-    # Create quantum circuit with n_features qubits
-    qc = QuantumCircuit(n_features)
-    
-    # Apply angle encoding to the circuit
-    qc = apply_angle_encoding(qc, angles, list(range(n_features)))
+     
+    # Angle embedding circuit
+    qc = angle_embedding(angles)
 
+    # Ansatz circuit
     ansatz = EfficientSU2(
-    num_qubits=n_features,
+    num_qubits=len(angles),
     su2_gates=["ry", "rz"],
     entanglement="circular",
     reps=2
@@ -32,7 +27,7 @@ def create_classifier_circuit(feature_vector: np.ndarray) -> QuantumCircuit:
 
     qc.compose(ansatz, inplace=True)
     
-    print(f"Classifier circuit created with {n_features} qubits.")
+    print(f"Classifier circuit created with {len(angles)} qubits.")
     print(f"Depth: {qc.depth()}, Size: {qc.size()} gates")
     
     return qc
@@ -50,9 +45,13 @@ def classify_with_circuit(circuit: QuantumCircuit) -> int:
     circuit.measure([0, 1], [0, 1])
     
     # Simulate the circuit
-    from qiskit import Aer, execute
-    simulator = Aer.get_backend('qasm_simulator')
-    result = execute(circuit, simulator, shots=1024).result()
+    sim = AerSimulator()
+
+    result = sim.run(
+        circuit,
+        shots=1000
+    ).result()
+
     counts = result.get_counts()
     
     # Get the most probable bitstring

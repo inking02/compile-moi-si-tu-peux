@@ -166,7 +166,7 @@ def create_nwpu_tensors(
 
 
 def create_anomaly_dataset(
-    ratio_anomaly: float = 0.1,
+    ratio_anomaly: float = 1,
     num_samples: int = 500,
     image_size: int = 32,
     normalize: bool = True,
