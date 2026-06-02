@@ -13,7 +13,7 @@ import numpy as np
 import torch
 from PIL import Image
 
-DATA_DIR = Path(__file__).resolve().parent
+DATA_DIR = Path(__file__).resolve().parent / "data" / "NWPU"
 ANOMALY_CLASSES = frozenset({"airplane", "ship", "harbor", "airport"})
 IMAGE_EXTENSIONS = frozenset({".jpg", ".jpeg", ".png", ".bmp", ".webp"})
 IMAGENET_MEAN = torch.tensor((0.485, 0.456, 0.406)).view(3, 1, 1)
