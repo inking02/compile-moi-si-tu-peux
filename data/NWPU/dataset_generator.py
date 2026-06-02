@@ -50,7 +50,9 @@ def _image_paths(class_dir: Path) -> list[Path]:
     )
 
 
-def _balanced_counts(total: int, class_names: list[str], rng: random.Random) -> dict[str, int]:
+def _balanced_counts(
+    total: int, class_names: list[str], rng: random.Random
+) -> dict[str, int]:
     """
     Splits a sample count as evenly as possible across class names.
 
@@ -86,7 +88,9 @@ def _load_image(path: Path, image_size: int, normalize: bool) -> torch.Tensor:
         torch.Tensor: Image tensor shaped ``(3, image_size, image_size)``.
     """
     with Image.open(path) as image:
-        image = image.convert("RGB").resize((image_size, image_size), Image.Resampling.BILINEAR)
+        image = image.convert("RGB").resize(
+            (image_size, image_size), Image.Resampling.BILINEAR
+        )
         array = np.array(image, dtype=np.float32) / 255.0
 
     tensor = torch.from_numpy(array).permute(2, 0, 1)
@@ -126,8 +130,12 @@ def _sample_split(
     num_anomalies = round(num_samples * ratio_anomaly)
     num_normal = num_samples - num_anomalies
 
-    anomaly_classes = sorted(class_name for class_name in class_to_idx if class_name in ANOMALY_CLASSES)
-    normal_classes = sorted(class_name for class_name in class_to_idx if class_name not in ANOMALY_CLASSES)
+    anomaly_classes = sorted(
+        class_name for class_name in class_to_idx if class_name in ANOMALY_CLASSES
+    )
+    normal_classes = sorted(
+        class_name for class_name in class_to_idx if class_name not in ANOMALY_CLASSES
+    )
     samples_per_class = {
         **_balanced_counts(num_anomalies, anomaly_classes, rng),
         **_balanced_counts(num_normal, normal_classes, rng),
@@ -217,14 +225,24 @@ def create_nwpu_tensors(
     train_classes = _class_names(train_dir)
     test_classes = _class_names(test_dir)
     if train_classes != test_classes:
-        raise ValueError(f"Train/test class folders do not match: {train_classes} != {test_classes}")
+        raise ValueError(
+            f"Train/test class folders do not match: {train_classes} != {test_classes}"
+        )
 
     missing_anomaly_classes = ANOMALY_CLASSES.difference(train_classes)
     if missing_anomaly_classes:
         missing = ", ".join(sorted(missing_anomaly_classes))
         raise ValueError(f"Missing anomaly class folders: {missing}")
 
-    class_to_idx = {class_name: idx for idx, class_name in enumerate(train_classes)}
+        # anomaly classes first: 0–3
+    sorted_anomalies = sorted(ANOMALY_CLASSES)
+
+    # then normal classes
+    sorted_normals = sorted(set(train_classes) - set(ANOMALY_CLASSES))
+
+    ordered_classes = sorted_anomalies + sorted_normals
+
+    class_to_idx = {class_name: idx for idx, class_name in enumerate(ordered_classes)}
     rng = random.Random(seed)
 
     train_tensors = _sample_split(
