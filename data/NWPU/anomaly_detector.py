@@ -8,7 +8,6 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.svm import OneClassSVM
 from sklearn.metrics import roc_auc_score
 
-from qiskit.circuit.library import ZZFeatureMap, ZFeatureMap, TwoLocal
 from qiskit_machine_learning.kernels import FidelityQuantumKernel
 from qiskit.circuit import QuantumCircuit, ParameterVector
 
@@ -101,11 +100,13 @@ def detect_anomaly(
 # Run pipeline
 def main():
 
-    #Fixing the seed for reproducibility
+    # Fixing the seed for reproducibility
     SEED = 67
     np.random.seed(SEED)
     torch.manual_seed(SEED)
     random.seed(SEED)
+
+    torch.use_deterministic_algorithms(True)
 
     # ====================================================
     # DATA
@@ -121,7 +122,6 @@ def main():
     x_test = test_tensor[1][0]
     y_test = test_tensor[1][1]
 
-
     # ====================================================
     # FEATURE EXTRACTION
     # ====================================================
@@ -132,14 +132,12 @@ def main():
     print("Train features:", train_features.shape)
     print("Test features:", test_features.shape)
 
-
     # ====================================================
     # PCA + scaler -> 8 DIMENSIONS
     # ====================================================
 
     train_pca = feature_reductor(train_features, num_features=8)
     test_pca = feature_reductor(train_features, num_features=8)
-
 
     # ====================================================
     # QUANTUM KERNEL
@@ -149,20 +147,17 @@ def main():
         x_train=train_pca, x_test=test_pca, num_features=8
     )
 
-
     # ====================================================
     # ONE-CLASS SVM
     # ====================================================
     # Unlike standard SVMs that require data from two classes to find a separating boundary, a One-Class SVM trains only on "normal" data to learn its distribution, flagging anything that deviates significantly from this norm
     ocsvm = create_and_train_classifier(train_kernel)
 
-
     # ====================================================
     # ANOMALY SCORES
     # ====================================================
 
     decision_scores, preds = detect_anomaly(ocsvm, test_kernel)
-
 
     # ====================================================
     # EVALUATION
@@ -174,14 +169,15 @@ def main():
 
     print(f"\nROC-AUC: {auc:.4f}")
 
-
     # ====================================================
     # SAMPLE OUTPUTS
     # ====================================================
 
     for i in range(len(y_test)):
         print(
-            f"Sample {i:03d} | " f"Score={decision_scores[i]:.6f} | " f"Label={y_test[i]}"
+            f"Sample {i:03d} | "
+            f"Score={decision_scores[i]:.6f} | "
+            f"Label={y_test[i]}"
         )
 
     # ====================================================
@@ -201,7 +197,6 @@ def main():
     print(f"True Negatives  (TN): {TN}")
     print(f"False Negatives (FN): {FN}")
 
-
     # ====================================================
     # DETECTED ANOMALIES (CORRECT)
     # ====================================================
@@ -213,7 +208,6 @@ def main():
     for i in range(len(y_test)):
         if preds[i] == 1 and y_test[i] == 1:
             print(f"[TP] Sample {i:03d} | Score={decision_scores[i]:.6f}")
-
 
     # ====================================================
     # FALSE ALARMS (FP)
@@ -227,7 +221,6 @@ def main():
         if preds[i] == 1 and y_test[i] == 0:
             print(f"[FP] Sample {i:03d} | Score={decision_scores[i]:.6f}")
 
-
     # ====================================================
     # MISSED ANOMALIES (FN)
     # ====================================================
@@ -240,13 +233,13 @@ def main():
         if preds[i] == 0 and y_test[i] == 1:
             print(f"[FN] Sample {i:03d} | Score={decision_scores[i]:.6f}")
 
-
     # ====================================================
     # OPTIONAL: ACCURACY
     # ====================================================
 
     accuracy = (preds == y_test).mean()
     print("\nAccuracy:", accuracy)
+
 
 if __name__ == "__main__":
     main()

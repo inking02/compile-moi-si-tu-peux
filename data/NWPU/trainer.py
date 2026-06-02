@@ -8,8 +8,6 @@ reservoir, and classical classifier head for NWPU image classification.
 from qiskit_algorithms.optimizers import COBYLA, ADAM
 from qiskit_machine_learning.neural_networks import SamplerQNN
 
-import numpy as np
-
 from dataset_generator import create_anomaly_dataset
 
 import merlin as ml
