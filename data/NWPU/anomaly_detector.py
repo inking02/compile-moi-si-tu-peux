@@ -7,13 +7,14 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.svm import OneClassSVM
 from sklearn.metrics import roc_auc_score
 
-from qiskit.circuit.library import ZZFeatureMap, ZFeatureMap
+from qiskit.circuit.library import ZZFeatureMap, ZFeatureMap, TwoLocal
 from qiskit_machine_learning.kernels import FidelityQuantumKernel
+from qiskit.circuit import QuantumCircuit, ParameterVector
 
 from dataset_generator import create_anomaly_dataset
 
 
-def extract_image_features(x: torch.Tensor) -> torch.Tensor:
+def extract_image_features(x: torch.Tensor) -> np.ndarray:
     resnet = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
 
     # Remove classification layer
@@ -33,10 +34,37 @@ def feature_reductor(x: np.ndarray, num_features: int = 10) -> np.ndarray:
 
 
 def create_quantum_kernels(
-    x_train: np.ndarray, x_test: np.ndarray
+    x_train: np.ndarray, x_test: np.ndarray, num_features: int = 10
 ) -> tuple[np.ndarray, np.ndarray]:
-    feature_map = ZFeatureMap(feature_dimension=10, reps=2)
-    kernel = FidelityQuantumKernel(feature_map=feature_map)
+    def build_feature_map(n_qubits=num_features):
+        x = ParameterVector("x", n_qubits)
+
+        qc = QuantumCircuit(n_qubits)
+
+        # -------------------------
+        # 1. Angle encoding block
+        # -------------------------
+        for i in range(n_qubits):
+            qc.ry(x[i], i)
+            qc.rz(x[i], i)
+
+        # -------------------------
+        # 2. Entangling block (linear)
+        # -------------------------
+        for i in range(n_qubits - 1):
+            qc.cx(i, i + 1)
+
+        # -------------------------
+        # 3. Second angle encoding
+        # -------------------------
+        for i in range(n_qubits):
+            qc.ry(2 * x[i], i)
+            qc.rz(2 * x[i], i)
+
+        return qc, x
+
+    feature_map = build_feature_map(n_qubits=num_features)
+    kernel = FidelityQuantumKernel(feature_map=feature_map[0])
     print("Building training kernel matrix...")
     K_train = kernel.evaluate(x_train, x_train)
     print("Building test kernel matrix...")
@@ -67,12 +95,12 @@ def detect_anomaly(
 # DATA
 # ====================================================
 
-train_tensor = create_anomaly_dataset(0.0, 200)
+train_tensor = create_anomaly_dataset(0.0, 100)
 
 x_train = train_tensor[0][0]
 y_train = train_tensor[0][1]
 
-test_tensor = create_anomaly_dataset(0.1, 200)
+test_tensor = create_anomaly_dataset(0.1, 100)
 
 x_test = test_tensor[1][0]
 y_test = test_tensor[1][1]
@@ -93,15 +121,17 @@ print("Test features:", test_features.shape)
 # PCA + scaler -> 8 DIMENSIONS
 # ====================================================
 
-train_pca = feature_reductor(train_features, num_features=10)
-test_pca = feature_reductor(train_features, num_features=10)
+train_pca = feature_reductor(train_features, num_features=8)
+test_pca = feature_reductor(train_features, num_features=8)
 
 
 # ====================================================
 # QUANTUM KERNEL
 # ====================================================
 
-train_kernel, test_kernel = create_quantum_kernels(x_train=train_pca, x_test=test_pca)
+train_kernel, test_kernel = create_quantum_kernels(
+    x_train=train_pca, x_test=test_pca, num_features=8
+)
 
 
 # ====================================================
@@ -121,6 +151,8 @@ decision_scores, preds = detect_anomaly(ocsvm, test_kernel)
 # ====================================================
 # EVALUATION
 # ====================================================
+
+y_test = y_test.numpy()
 
 auc = roc_auc_score(y_test, decision_scores)
 
