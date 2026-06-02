@@ -82,8 +82,8 @@ y_test = test_tensor[1][1]
 # FEATURE EXTRACTION
 # ====================================================
 
-train_features = extract_image_features(x_train).cpu().numpy()
-test_features = extract_image_features(x_train).cpu().numpy()
+train_features = extract_image_features(x_train)
+test_features = extract_image_features(x_train)
 
 print("Train features:", train_features.shape)
 print("Test features:", test_features.shape)
