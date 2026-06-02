@@ -1,3 +1,14 @@
+
+"""
+File: trainer.py
+
+Description: This script experiments with a CNN encoder, Merlin quantum
+reservoir, and classical classifier head for NWPU image classification.
+"""
+
+from qiskit_algorithms.optimizers import COBYLA, ADAM
+from qiskit_machine_learning.neural_networks import SamplerQNN
+
 import numpy as np
 
 from dataset_generator import create_anomaly_dataset
@@ -43,6 +54,8 @@ def rafine_y_values(y_train, y_test):
 
 
 class CNNEncoder(nn.Module):
+    """Convolutional encoder that maps RGB images to latent features."""
+
     def __init__(self):
         super().__init__()
 
@@ -60,6 +73,15 @@ class CNNEncoder(nn.Module):
         )
 
     def forward(self, x):
+        """
+        Encodes an image batch into latent features.
+
+        Args:
+            x (torch.Tensor): RGB image batch.
+
+        Returns:
+            torch.Tensor: Latent feature tensor.
+        """
         return self.net(x)
 
 
@@ -84,6 +106,8 @@ def create_reservoir(n_modes: int, n_photons: int) -> ml.QuantumLayer:
 
 
 class QuantumReservoirNet(nn.Module):
+    """CNN and quantum-reservoir classifier for NWPU image labels."""
+
     def __init__(self):
         super().__init__()
 
@@ -96,6 +120,15 @@ class QuantumReservoirNet(nn.Module):
         )
 
     def forward(self, x):
+        """
+        Computes class logits for an image batch.
+
+        Args:
+            x (torch.Tensor): RGB image batch.
+
+        Returns:
+            torch.Tensor: Class logits.
+        """
         x = self.encoder(x)
 
         x = torch.tanh(x)
@@ -132,6 +165,17 @@ batch_size = 16
 
 
 def accuracy(model, x, y):
+    """
+    Computes classification accuracy for a model and dataset tensors.
+
+    Args:
+        model (torch.nn.Module): Model to evaluate.
+        x (torch.Tensor): Input image batch.
+        y (torch.Tensor): Ground-truth class labels.
+
+    Returns:
+        float: Accuracy in the range ``[0, 1]``.
+    """
     model.eval()
     with torch.no_grad():
         logits = model(x)

@@ -1,3 +1,11 @@
+"""
+File: dataset_generator.py
+
+Description: This module creates balanced NWPU train and test tensors for anomaly
+detection experiments, including image loading, class sampling, normalization,
+and anomaly/photo-type label generation.
+"""
+
 from pathlib import Path
 import random
 
@@ -13,10 +21,28 @@ IMAGENET_STD = torch.tensor((0.229, 0.224, 0.225)).view(3, 1, 1)
 
 
 def _class_names(split_dir: Path) -> list[str]:
+    """
+    Returns sorted class folder names for a dataset split.
+
+    Args:
+        split_dir (Path): Directory containing class subdirectories.
+
+    Returns:
+        list[str]: Sorted class names.
+    """
     return sorted(path.name for path in split_dir.iterdir() if path.is_dir())
 
 
 def _image_paths(class_dir: Path) -> list[Path]:
+    """
+    Returns sorted supported image paths for a class directory.
+
+    Args:
+        class_dir (Path): Directory containing image files.
+
+    Returns:
+        list[Path]: Sorted paths whose suffix is supported.
+    """
     return sorted(
         path
         for path in class_dir.iterdir()
@@ -25,6 +51,17 @@ def _image_paths(class_dir: Path) -> list[Path]:
 
 
 def _balanced_counts(total: int, class_names: list[str], rng: random.Random) -> dict[str, int]:
+    """
+    Splits a sample count as evenly as possible across class names.
+
+    Args:
+        total (int): Total number of samples to distribute.
+        class_names (list[str]): Class names that should receive samples.
+        rng (random.Random): Random generator used to assign any remainder.
+
+    Returns:
+        dict[str, int]: Mapping from class name to requested sample count.
+    """
     base_count, remainder = divmod(total, len(class_names))
     shuffled_classes = class_names[:]
     rng.shuffle(shuffled_classes)
@@ -37,6 +74,17 @@ def _balanced_counts(total: int, class_names: list[str], rng: random.Random) -> 
 
 
 def _load_image(path: Path, image_size: int, normalize: bool) -> torch.Tensor:
+    """
+    Loads one image as an RGB tensor.
+
+    Args:
+        path (Path): Path to the image file.
+        image_size (int): Square output image size.
+        normalize (bool): Whether to apply ImageNet normalization.
+
+    Returns:
+        torch.Tensor: Image tensor shaped ``(3, image_size, image_size)``.
+    """
     with Image.open(path) as image:
         image = image.convert("RGB").resize((image_size, image_size), Image.Resampling.BILINEAR)
         array = np.array(image, dtype=np.float32) / 255.0
@@ -56,6 +104,25 @@ def _sample_split(
     normalize: bool,
     rng: random.Random,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """
+    Samples one NWPU split into image, anomaly-label, and class-label tensors.
+
+    Args:
+        split_dir (Path): Directory containing one dataset split.
+        class_to_idx (dict[str, int]): Mapping from class name to numeric label.
+        num_samples (int): Number of samples to draw from the split.
+        ratio_anomaly (float): Fraction of samples drawn from anomaly classes.
+        image_size (int): Square output image size.
+        normalize (bool): Whether to apply ImageNet normalization.
+        rng (random.Random): Random generator used for sampling and shuffling.
+
+    Returns:
+        tuple[torch.Tensor, torch.Tensor, torch.Tensor]: Images, anomaly labels,
+        and photo-type labels.
+
+    Raises:
+        ValueError: If a class does not contain enough images.
+    """
     num_anomalies = round(num_samples * ratio_anomaly)
     num_normal = num_samples - num_anomalies
 
@@ -105,7 +172,8 @@ def create_nwpu_tensors(
     tuple[torch.Tensor, torch.Tensor, torch.Tensor],
     tuple[torch.Tensor, torch.Tensor, torch.Tensor],
 ]:
-    """Return train/test NWPU tensors with anomaly and photo-type labels.
+    """
+    Returns train/test NWPU tensors with anomaly and photo-type labels.
 
     Each split returns:
         images: float tensor shaped (num_samples, 3, image_size, image_size)
@@ -116,6 +184,21 @@ def create_nwpu_tensors(
     ratio_anomaly is the fraction of each split sampled from anomaly classes.
     Samples are balanced as evenly as possible across anomaly classes and across
     non-anomaly classes.
+
+    Args:
+        data_dir (str or Path): Root directory containing ``train`` and ``test``.
+        num_samples (int): Number of samples to draw for each split.
+        ratio_anomaly (float): Fraction of samples drawn from anomaly classes.
+        image_size (int): Square output image size.
+        normalize (bool): Whether to apply ImageNet normalization.
+        seed (int or None): Random seed for deterministic sampling.
+
+    Returns:
+        tuple: Train and test dataset tuples.
+
+    Raises:
+        ValueError: If arguments are invalid or class folders do not match.
+        FileNotFoundError: If the train or test directory is missing.
     """
     if num_samples < 1:
         raise ValueError("num_samples must be at least 1")
@@ -175,6 +258,19 @@ def create_anomaly_dataset(
     tuple[torch.Tensor, torch.Tensor, torch.Tensor],
     tuple[torch.Tensor, torch.Tensor, torch.Tensor],
 ]:
+    """
+    Creates an NWPU anomaly dataset using the default data directory.
+
+    Args:
+        ratio_anomaly (float): Fraction of samples drawn from anomaly classes.
+        num_samples (int): Number of samples to draw for each split.
+        image_size (int): Square output image size.
+        normalize (bool): Whether to apply ImageNet normalization.
+        seed (int or None): Random seed for deterministic sampling.
+
+    Returns:
+        tuple: Train and test dataset tuples.
+    """
     return create_nwpu_tensors(
         ratio_anomaly=ratio_anomaly,
         num_samples=num_samples,

@@ -1,3 +1,10 @@
+"""
+File: resnet_approach.py
+
+Description: This script experiments with ResNet feature extraction, compactness
+training, PCA projection, and a quantum kernel for NWPU anomaly scoring.
+"""
+
 import torch
 import torchvision.models as models
 from sklearn.decomposition import PCA
@@ -49,6 +56,15 @@ optimizer = torch.optim.Adam(resnet.parameters(), lr=1e-4)
 
 
 def compactness_loss(z):
+    """
+    Computes feature compactness around the batch mean.
+
+    Args:
+        z (torch.Tensor): Feature tensor for a batch of images.
+
+    Returns:
+        torch.Tensor: Mean squared distance from each feature to the batch mean.
+    """
     return ((z - z.mean(dim=0)) ** 2).mean()
 
 
