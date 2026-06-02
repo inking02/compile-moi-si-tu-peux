@@ -1,94 +1,45 @@
-from qiskit_algorithms.optimizers import COBYLA, ADAM
-from qiskit_machine_learning.neural_networks import SamplerQNN
 import numpy as np
 
-from qiskit import QuantumCircuit
-from qiskit_machine_learning.algorithms.classifiers import NeuralNetworkClassifier
-
 from dataset_generator import create_anomaly_dataset
-
-from sklearn.decomposition import PCA
-
-from qiskit.circuit.library import ZZFeatureMap, EfficientSU2
-import time
-
-SEED = 8398
-
-nb_features = 16
-
-"""
-optimizer = ADAM(maxiter=num_iter)
-
-np.random.seed(SEED)
-
-ansatz = EfficientSU2(
-    num_qubits=nb_features,
-    su2_gates=["ry", "rz"],
-    entanglement="circular",
-    reps=2
-    )
-
-emb_circuit = ZZFeatureMap(nb_features, reps=1, entanglement="circular")
-
-qc = QuantumCircuit(nb_features)
-
-qc.compose(emb_circuit, inplace=True)
-qc.compose(ansatz, inplace=True)
-
-
-def interpret(x):
-    return x % 4
-
-qnn=SamplerQNN(
-    circuit=qc,  
-    input_params=emb_circuit.parameters,
-    weight_params=ansatz.parameters,
-    interpret = interpret,
-    output_shape=4  # Reshape by the number of classical registers
-)
-
-
-
-initial_weights = np.random.rand(ansatz.num_parameters) 
-
-circuit_classifier = NeuralNetworkClassifier(neural_network=qnn,optimizer=optimizer,initial_point=initial_weights)
-"""
-
-# Experiment Parameters
-
-nb_classes = 4
-anomaly_ratio = 1
-
-tensor = create_anomaly_dataset(anomaly_ratio, 400)
-
-# Splitting the data in training set and test set
-x_train = tensor[0][0].detach().numpy()
-y_train = tensor[0][2].detach().numpy()
-
-x_test = tensor[1][0].detach().numpy()
-y_test = tensor[1][2].detach().numpy()
-
-"""
-pca = PCA(n_components=nb_features)
-
-x_train_flat = x_train.reshape(x_train.shape[0], -1)
-x_test_flat = x_test.reshape(x_test.shape[0], -1)
-
-pca.fit(x_train_flat)
-
-x_train = pca.transform(x_train_flat)
-x_test = pca.transform(x_test_flat)
-"""
-
-unique = np.unique(y_train)
-label_map = {old: new for new, old in enumerate(unique)}
-y_train = np.vectorize(label_map.get)(y_train)
-y_test = np.vectorize(label_map.get)(y_test)
 
 import merlin as ml
 import torch.nn as nn
 import torch
 import torch.optim as optim
+
+
+nb_features = 16
+
+
+
+def get_datas(num_data: int, anomaly_ratio: float):
+    tensor = create_anomaly_dataset(anomaly_ratio, num_data)
+
+    # Splitting the data in training set and test set
+    x_train = tensor[0][0].detach().numpy()
+    y_train = tensor[0][2].detach().numpy()
+
+    x_test = tensor[1][0].detach().numpy()
+    y_test = tensor[1][2].detach().numpy()
+
+    return x_train, y_train, x_test, y_test
+
+
+
+
+
+def rafine_y_values(y_train, y_test):
+
+    unique = np.unique(y_train)
+    label_map = {old: new for new, old in enumerate(unique)}
+    y_train = np.vectorize(label_map.get)(y_train)
+    y_test = np.vectorize(label_map.get)(y_test)
+
+    return y_train, y_test
+
+
+
+
 
 
 class CNNEncoder(nn.Module):
@@ -112,17 +63,24 @@ class CNNEncoder(nn.Module):
         return self.net(x)
 
 
-builder = ml.CircuitBuilder(n_modes=11)
 
-for _ in range(3):
-    builder.add_entangling_layer()
 
-builder.add_angle_encoding(modes=list(range(10)))
+def create_reservoir(n_modes: int, n_photons: int) -> ml.QuantumLayer:
 
-for _ in range(3):
-    builder.add_entangling_layer()
+    builder = ml.CircuitBuilder(n_modes=11)
 
-reservoir = ml.QuantumLayer(input_size=10, builder=builder, n_photons=5)
+    for _ in range(3):
+        builder.add_entangling_layer()
+
+    builder.add_angle_encoding(modes=list(range(10)))
+
+    for _ in range(3):
+        builder.add_entangling_layer()
+
+    reservoir = ml.QuantumLayer(input_size=10, builder=builder, n_photons=5)
+
+    return reservoir
+
 
 
 class QuantumReservoirNet(nn.Module):
@@ -131,7 +89,7 @@ class QuantumReservoirNet(nn.Module):
 
         self.encoder = CNNEncoder()
 
-        self.reservoir = reservoir
+        self.reservoir = create_reservoir(n_modes=11, n_photons=5)
 
         self.classifier = nn.Sequential(
             nn.Linear(self.reservoir.output_size, 32), nn.ReLU(), nn.Linear(32, 4)
@@ -148,26 +106,25 @@ class QuantumReservoirNet(nn.Module):
         return x
 
 
-model = QuantumReservoirNet()
+# nb_classes = 4
+anomaly_ratio = 1
 
+x_train, y_train, x_test, y_test = get_datas(400, anomaly_ratio)
 
-# -----------------------
-# Torch conversion
-# -----------------------
+# Refine y values to be between 0 and nb_classes-1
+y_train, y_test = rafine_y_values(y_train, y_test)
+
+# Convert to PyTorch tensors
 x_train_t = torch.tensor(x_train, dtype=torch.float32)
 y_train_t = torch.tensor(y_train, dtype=torch.long)
 
 x_test_t = torch.tensor(x_test, dtype=torch.float32)
 y_test_t = torch.tensor(y_test, dtype=torch.long)
 
+# Define the model, loss function and optimizer
+model = QuantumReservoirNet()
 
-# -----------------------
-# Model, loss, optimizer
-# -----------------------
 criterion = nn.CrossEntropyLoss()
-# optimizer = optim.Adam(
-#    list(model.encoder.parameters()) + list(model.classifier.parameters()), lr=1e-3
-# )
 optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
 epochs = 100
@@ -186,40 +143,68 @@ def accuracy(model, x, y):
 # -----------------------
 # Training loop
 # -----------------------
-model.train()
 
-n = x_train_t.shape[0]
 
-for epoch in range(epochs):
-    perm = torch.randperm(n)
+def train(
+    model: nn.Module,
+    x_train_t: torch.Tensor,
+    y_train_t: torch.Tensor,
+    x_test_t: torch.Tensor,
+    y_test_t: torch.Tensor,
+    criterion: nn.Module,
+    optimizer: optim.Optimizer,
+    epochs: int = 100,
+    batch_size: int = 16,
+):
+    
+    model.train()
+    n = x_train_t.shape[0]
 
-    for i in range(0, n, batch_size):
-        idx = perm[i : i + batch_size]
+    for epoch in range(epochs):
+        perm = torch.randperm(n)
 
-        xb = x_train_t[idx]
-        yb = y_train_t[idx]
+        for i in range(0, n, batch_size):
+            idx = perm[i : i + batch_size]
 
-        optimizer.zero_grad()
-        logits = model(xb)
-        loss = criterion(logits, yb)
-        loss.backward()
-        optimizer.step()
+            xb = x_train_t[idx]
+            yb = y_train_t[idx]
 
-    train_acc_epoch = accuracy(model, x_train_t, y_train_t)
-    test_acc_epoch = accuracy(model, x_test_t, y_test_t)
+            optimizer.zero_grad()
+            logits = model(xb)
+            loss = criterion(logits, yb)
+            loss.backward()
+            optimizer.step()
 
-    print(
-        f"Epoch {epoch+1}/{epochs} | Loss: {loss.item():.4f} | "
-        f"Train acc: {train_acc_epoch:.3f} | Test acc: {test_acc_epoch:.3f}"
-    )
+        train_acc_epoch = accuracy(model, x_train_t, y_train_t)
+        test_acc_epoch = accuracy(model, x_test_t, y_test_t)
+
+        print(
+            f"Epoch {epoch+1}/{epochs} | Loss: {loss.item():.4f} | "
+            f"Train acc: {train_acc_epoch:.3f} | Test acc: {test_acc_epoch:.3f}"
+        )
+
+    return model
+
+model = train(
+    model,
+    x_train_t,
+    y_train_t,
+    x_test_t,
+    y_test_t,
+    criterion,
+    optimizer,
+    epochs=epochs,
+    batch_size=batch_size,
+)
 
 # -----------------------
 # Final evaluation
 # -----------------------
-train_acc = accuracy(model, x_train_t, y_train_t)
-test_acc = accuracy(model, x_test_t, y_test_t)
+def evaluate(model, x_train_t, y_train_t, x_test_t, y_test_t):
+    train_acc = accuracy(model, x_train_t, y_train_t)
+    test_acc = accuracy(model, x_test_t, y_test_t)
 
-print(
-    f">\n> Accuracy on the training set: {train_acc}\n"
-    f"> Accuracy on the test set: {test_acc}\n>"
-)
+    print(
+        f">\n> Accuracy on the training set: {train_acc}\n"
+        f"> Accuracy on the test set: {test_acc}\n>"
+    )
