@@ -11,14 +11,14 @@ defense applications.
 
 ## Overview
 
-The main workflow is implemented in `data/NWPU` and follows a two-stage
+The main workflow is implemented in [solution.ipynb](solution.ipynb) and follows a two-stage
 classification pipeline.
 
 First, the system decides whether an image is normal or anomalous. It uses a
 ResNet18 feature extractor, reduces the feature space with PCA to 10
-components, and applies a One-Class QSVM to separate normal samples from
-potential anomalies.
+components and applies a One-Class QSVM to separate normal samples from
+potential anomalies. This model is trained with a dataset with only "normal" data.
 
-Second, when an anomaly is detected, the system classifies the precise anomaly
-type. This stage uses a classical convolutional network, a boson sampler layer,
-a non-linearity, and a final linear layer to predict the anomaly class.
+Then, when an anomaly is detected, the system classifies the precise anomaly
+type. This stage uses a classical convolutional network, a boson sampler layer that generates non-linearity, and a final linear layer to predict the anomaly class. This model is trained with only anomalies features.
+
