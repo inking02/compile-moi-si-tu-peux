@@ -315,7 +315,7 @@ class ImageAngleTransformer:
     the number of qubits used by the angle embedding.
     """
 
-    def __init__(self, output_dim=4):
+    def __init__(self, output_dim=16):
         if output_dim < 1:
             raise ValueError("output_dim must be at least 1.")
 

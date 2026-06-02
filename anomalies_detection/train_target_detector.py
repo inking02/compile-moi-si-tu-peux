@@ -35,7 +35,9 @@ def main():
     test_angles = transformer.transform(X_test)
 
     model = QsvmModel({
-        "embedding": "angle_y",
+        "embedding": args.embedding,
+        "embedding_reps": args.embedding_reps,
+        "num_qubits": args.qsvm_qubits,
         "label_names": LABEL_NAMES,
         "positive_label": "cible",
         "svm": SVC(
@@ -71,7 +73,9 @@ def main():
     print(f"Train samples: {len(X_train)} ({int(y_train.sum())} cible, {len(y_train) - int(y_train.sum())} autre)")
     print(f"Test samples: {len(X_test)} ({int(y_test.sum())} cible, {len(y_test) - int(y_test.sum())} autre)")
     print(f"Raw image feature dim: {X_train.shape[1]}")
-    print(f"QSVM angle dim / qubits: {train_angles.shape[1]}")
+    print(f"PCA dim: {train_angles.shape[1]}")
+    print(f"QSVM qubits: {model.num_qubits}")
+    print(f"Embedding: {args.embedding} ({args.embedding_reps} reps)")
     print(f"Class weight: {args.class_weight}")
     print(f"Detection threshold: {threshold:.2f}")
     print(f"Train accuracy: {train_accuracy:.2f}")
@@ -144,7 +148,10 @@ def _class_weight(value):
 def _parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-root", default="../data/NWPU")
-    parser.add_argument("--output-dim", type=int, default=8)
+    parser.add_argument("--output-dim", type=int, default=16)
+    parser.add_argument("--embedding", default="image_reupload")
+    parser.add_argument("--embedding-reps", type=int, default=2)
+    parser.add_argument("--qsvm-qubits", type=int, default=8)
     parser.add_argument("--histogram-bins", type=int, default=8)
     parser.add_argument("--tolerance", default="auto")
     parser.add_argument("--class-weight", choices=["balanced", "none"], default="balanced")

@@ -20,6 +20,8 @@ class Embedding(Enum):
     ANGLE_X = "X"
     ANGLE_Y = "Y"
     ANGLE_Z = "Z"
+    IMAGE_ZZ = "image_zz"
+    IMAGE_REUPLOAD = "image_reupload"
 
 
 def prepare_visual_features(features, target_size=None, normalize=True) -> torch.Tensor:

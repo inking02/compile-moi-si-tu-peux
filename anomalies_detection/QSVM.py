@@ -31,6 +31,10 @@ EMBEDDING_ALIASES = {
     "y": Embedding.ANGLE_Y,
     "angle_z": Embedding.ANGLE_Z,
     "z": Embedding.ANGLE_Z,
+    "image_zz": Embedding.IMAGE_ZZ,
+    "zz": Embedding.IMAGE_ZZ,
+    "image_reupload": Embedding.IMAGE_REUPLOAD,
+    "reupload": Embedding.IMAGE_REUPLOAD,
 }
 
 
@@ -47,7 +51,9 @@ class QsvmModel:
 
     def __init__(self, config=None) -> None:
         self.svm = SVC(kernel='precomputed', probability=True)  # Initialize SVM with a precomputed kernel
-        self.embedding_type = Embedding.ANGLE_Y  # Default embedding type
+        self.embedding_type = Embedding.IMAGE_REUPLOAD  # Default embedding type
+        self.embedding_reps = 2
+        self.num_qubits_override = None
         self.trained = False
         self.X_train = None
         self.label_names = SUSPICIOUS_EVENT_LABELS.copy()
@@ -221,6 +227,10 @@ class QsvmModel:
             circuit.initialize(self._to_numpy(x / norm), range(self.num_qubits))
         elif self.embedding_type in {Embedding.ANGLE_X, Embedding.ANGLE_Y, Embedding.ANGLE_Z}:
             self._apply_angle_embedding(circuit, x)
+        elif self.embedding_type == Embedding.IMAGE_ZZ:
+            self._apply_image_zz_embedding(circuit, x)
+        elif self.embedding_type == Embedding.IMAGE_REUPLOAD:
+            self._apply_image_reupload_embedding(circuit, x)
         else:
             raise ValueError(f"Unsupported embedding type: {self.embedding_type}")
 
@@ -235,6 +245,61 @@ class QsvmModel:
                 circuit.ry(angle, qubit)
             elif self.embedding_type == Embedding.ANGLE_Z:
                 circuit.rz(angle, qubit)
+
+    def _apply_image_zz_embedding(self, circuit, x):
+        """
+        Image feature map for PCA-compressed visual features.
+
+        Each PCA component is encoded with local rotations, then neighboring
+        components interact through ZZ-style phases. The ring entanglement helps
+        the kernel compare feature combinations such as object/scene structure,
+        not only independent feature values.
+        """
+        values = [float(value.item()) for value in x]
+
+        for _ in range(self.embedding_reps):
+            for qubit, value in enumerate(values):
+                circuit.ry(value, qubit)
+                circuit.rz(value * value / np.pi, qubit)
+
+            if self.num_qubits > 1:
+                for qubit in range(self.num_qubits):
+                    target = (qubit + 1) % self.num_qubits
+                    self._apply_zz_phase(
+                        circuit,
+                        qubit,
+                        target,
+                        values[qubit],
+                        values[target],
+                    )
+
+    def _apply_zz_phase(self, circuit, control_qubit, target_qubit, x1, x2):
+        circuit.cx(control_qubit, target_qubit)
+        circuit.rz((np.pi - x1) * (np.pi - x2) / np.pi, target_qubit)
+        circuit.cx(control_qubit, target_qubit)
+
+    def _apply_image_reupload_embedding(self, circuit, x):
+        """
+        Compact image feature map for PCA16-style vectors.
+
+        Features are repeatedly uploaded onto a smaller qubit register. This can
+        keep PCA16 information while using, for example, 8 qubits instead of 16.
+        """
+        values = [float(value.item()) for value in x]
+
+        for rep in range(self.embedding_reps):
+            for feature_index, value in enumerate(values):
+                qubit = feature_index % self.num_qubits
+                phase = value * (feature_index + 1) / len(values)
+                circuit.ry(value, qubit)
+                circuit.rz(phase, qubit)
+
+            if self.num_qubits > 1:
+                for qubit in range(self.num_qubits):
+                    target = (qubit + 1) % self.num_qubits
+                    left = values[qubit % len(values)]
+                    right = values[(qubit + rep + 1) % len(values)]
+                    self._apply_zz_phase(circuit, qubit, target, left, right)
 
     def _predict_scores(self, kernel_matrix):
         """
@@ -270,6 +335,10 @@ class QsvmModel:
                 raise ValueError(f"The number of features {X_train.shape[1]} is not a power of 2 for amplitude embedding. "
                                  f"Therefore, {n} is not valid for the number of qubits.")
             self.num_qubits = int(n)
+        elif self.embedding_type == Embedding.IMAGE_REUPLOAD and self.num_qubits_override is not None:
+            if self.num_qubits_override < 1:
+                raise ValueError("num_qubits must be at least 1.")
+            self.num_qubits = min(self.num_qubits_override, X_train.shape[1])
         else:
             self.num_qubits = X_train.shape[1]
 
@@ -299,6 +368,8 @@ class QsvmModel:
         self.positive_label = config.get("positive_label", self.positive_label)
         self.default_tolerance = config.get("tolerance", self.default_tolerance)
         self.verbose = config.get("verbose", self.verbose)
+        self.embedding_reps = config.get("embedding_reps", self.embedding_reps)
+        self.num_qubits_override = config.get("num_qubits", self.num_qubits_override)
 
         embedding_choice = config.get("embedding")
         if isinstance(embedding_choice, str):
