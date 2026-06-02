@@ -17,7 +17,7 @@ import torch.nn as nn
 import torch
 import torch.optim as optim
 
-nb_features = 16
+
 
 
 def get_datas(num_data: int, anomaly_ratio: float):
@@ -117,25 +117,7 @@ class QuantumReservoirNet(nn.Module):
 
 
 # nb_classes = 4
-anomaly_ratio = 1
 
-x_train, y_train, x_test, y_test = get_datas(400, anomaly_ratio)
-
-# Convert to PyTorch tensors
-x_train_t = torch.tensor(x_train, dtype=torch.float32)
-y_train_t = torch.tensor(y_train, dtype=torch.long)
-
-x_test_t = torch.tensor(x_test, dtype=torch.float32)
-y_test_t = torch.tensor(y_test, dtype=torch.long)
-
-# Define the model, loss function and optimizer
-model = QuantumReservoirNet()
-
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=1e-3)
-
-epochs = 100
-batch_size = 16
 
 
 def accuracy(model, x, y):
@@ -204,7 +186,32 @@ def train(
     return model
 
 
-model = train(
+
+
+def main():
+
+    anomaly_ratio = 1
+
+    x_train, y_train, x_test, y_test = get_datas(400, anomaly_ratio)
+
+    # Convert to PyTorch tensors
+    x_train_t = torch.tensor(x_train, dtype=torch.float32)
+    y_train_t = torch.tensor(y_train, dtype=torch.long)
+
+    x_test_t = torch.tensor(x_test, dtype=torch.float32)
+    y_test_t = torch.tensor(y_test, dtype=torch.long)
+
+    # Define the model, loss function and optimizer
+    model = QuantumReservoirNet()
+
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=1e-3)
+
+    epochs = 100
+    batch_size = 16
+
+
+    model = train(
     model,
     x_train_t,
     y_train_t,
@@ -214,7 +221,7 @@ model = train(
     optimizer,
     epochs=epochs,
     batch_size=batch_size,
-)
+    )
 
 
 # -----------------------
@@ -228,3 +235,7 @@ def evaluate(model, x_train_t, y_train_t, x_test_t, y_test_t):
         f">\n> Accuracy on the training set: {train_acc}\n"
         f"> Accuracy on the test set: {test_acc}\n>"
     )
+
+
+if __name__ == "__main__":
+   main()
