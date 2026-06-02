@@ -20,5 +20,5 @@ components and applies a One-Class QSVM to separate normal samples from
 potential anomalies. This model is trained with a dataset with only "normal" data.
 
 Then, when an anomaly is detected, the system classifies the precise anomaly
-type. This stage uses a classical convolutional network, a boson sampler layer that generates non-linearity, and a final linear layer to predict the anomaly class. This model is trained with only anomalies features.
+type. This stage uses a classical convolution network, a boson sampler layer that generates non-linearity, and a final linear layer to predict the anomaly class. This model is trained with only anomalies features.
 
