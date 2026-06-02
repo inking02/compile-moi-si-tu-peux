@@ -1,6 +1,7 @@
 import torch
 import torchvision.models as models
 import numpy as np
+import random
 
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import MinMaxScaler
@@ -98,144 +99,154 @@ def detect_anomaly(
 
 ######################
 # Run pipeline
+def main():
 
-# ====================================================
-# DATA
-# ====================================================
+    #Fixing the seed for reproducibility
+    SEED = 67
+    np.random.seed(SEED)
+    torch.manual_seed(SEED)
+    random.seed(SEED)
 
-train_tensor = create_anomaly_dataset(0.0, 100)
+    # ====================================================
+    # DATA
+    # ====================================================
 
-x_train = train_tensor[0][0]
-y_train = train_tensor[0][1]
+    train_tensor = create_anomaly_dataset(0.0, 100)
 
-test_tensor = create_anomaly_dataset(0.1, 100)
+    x_train = train_tensor[0][0]
+    y_train = train_tensor[0][1]
 
-x_test = test_tensor[1][0]
-y_test = test_tensor[1][1]
+    test_tensor = create_anomaly_dataset(0.1, 100)
 
-
-# ====================================================
-# FEATURE EXTRACTION
-# ====================================================
-
-train_features = extract_image_features(x_train)
-test_features = extract_image_features(x_train)
-
-print("Train features:", train_features.shape)
-print("Test features:", test_features.shape)
+    x_test = test_tensor[1][0]
+    y_test = test_tensor[1][1]
 
 
-# ====================================================
-# PCA + scaler -> 8 DIMENSIONS
-# ====================================================
+    # ====================================================
+    # FEATURE EXTRACTION
+    # ====================================================
 
-train_pca = feature_reductor(train_features, num_features=8)
-test_pca = feature_reductor(train_features, num_features=8)
+    train_features = extract_image_features(x_train)
+    test_features = extract_image_features(x_train)
 
-
-# ====================================================
-# QUANTUM KERNEL
-# ====================================================
-
-train_kernel, test_kernel = create_quantum_kernels(
-    x_train=train_pca, x_test=test_pca, num_features=8
-)
+    print("Train features:", train_features.shape)
+    print("Test features:", test_features.shape)
 
 
-# ====================================================
-# ONE-CLASS SVM
-# ====================================================
-# Unlike standard SVMs that require data from two classes to find a separating boundary, a One-Class SVM trains only on "normal" data to learn its distribution, flagging anything that deviates significantly from this norm
-ocsvm = create_and_train_classifier(train_kernel)
+    # ====================================================
+    # PCA + scaler -> 8 DIMENSIONS
+    # ====================================================
+
+    train_pca = feature_reductor(train_features, num_features=8)
+    test_pca = feature_reductor(train_features, num_features=8)
 
 
-# ====================================================
-# ANOMALY SCORES
-# ====================================================
+    # ====================================================
+    # QUANTUM KERNEL
+    # ====================================================
 
-decision_scores, preds = detect_anomaly(ocsvm, test_kernel)
-
-
-# ====================================================
-# EVALUATION
-# ====================================================
-
-y_test = y_test.numpy()
-
-auc = roc_auc_score(y_test, decision_scores)
-
-print(f"\nROC-AUC: {auc:.4f}")
-
-
-# ====================================================
-# SAMPLE OUTPUTS
-# ====================================================
-
-for i in range(len(y_test)):
-    print(
-        f"Sample {i:03d} | " f"Score={decision_scores[i]:.6f} | " f"Label={y_test[i]}"
+    train_kernel, test_kernel = create_quantum_kernels(
+        x_train=train_pca, x_test=test_pca, num_features=8
     )
 
-# ====================================================
-# CONFUSION MATRIX COMPONENTS
-# ====================================================
 
-TP = np.sum((preds == 1) & (y_test == 1))
-FP = np.sum((preds == 1) & (y_test == 0))
-TN = np.sum((preds == 0) & (y_test == 0))
-FN = np.sum((preds == 0) & (y_test == 1))
-
-print("\n==============================")
-print("CONFUSION MATRIX SUMMARY")
-print("==============================")
-print(f"True Positives  (TP): {TP}")
-print(f"False Positives (FP): {FP}")
-print(f"True Negatives  (TN): {TN}")
-print(f"False Negatives (FN): {FN}")
+    # ====================================================
+    # ONE-CLASS SVM
+    # ====================================================
+    # Unlike standard SVMs that require data from two classes to find a separating boundary, a One-Class SVM trains only on "normal" data to learn its distribution, flagging anything that deviates significantly from this norm
+    ocsvm = create_and_train_classifier(train_kernel)
 
 
-# ====================================================
-# DETECTED ANOMALIES (CORRECT)
-# ====================================================
+    # ====================================================
+    # ANOMALY SCORES
+    # ====================================================
 
-print("\n==============================")
-print("DETECTED ANOMALIES (TP)")
-print("==============================")
-
-for i in range(len(y_test)):
-    if preds[i] == 1 and y_test[i] == 1:
-        print(f"[TP] Sample {i:03d} | Score={decision_scores[i]:.6f}")
+    decision_scores, preds = detect_anomaly(ocsvm, test_kernel)
 
 
-# ====================================================
-# FALSE ALARMS (FP)
-# ====================================================
+    # ====================================================
+    # EVALUATION
+    # ====================================================
 
-print("\n==============================")
-print("FALSE POSITIVES (Normal flagged as anomaly)")
-print("==============================")
+    y_test = y_test.numpy()
 
-for i in range(len(y_test)):
-    if preds[i] == 1 and y_test[i] == 0:
-        print(f"[FP] Sample {i:03d} | Score={decision_scores[i]:.6f}")
+    auc = roc_auc_score(y_test, decision_scores)
+
+    print(f"\nROC-AUC: {auc:.4f}")
 
 
-# ====================================================
-# MISSED ANOMALIES (FN)
-# ====================================================
+    # ====================================================
+    # SAMPLE OUTPUTS
+    # ====================================================
 
-print("\n==============================")
-print("MISSED ANOMALIES (FN)")
-print("==============================")
+    for i in range(len(y_test)):
+        print(
+            f"Sample {i:03d} | " f"Score={decision_scores[i]:.6f} | " f"Label={y_test[i]}"
+        )
 
-for i in range(len(y_test)):
-    if preds[i] == 0 and y_test[i] == 1:
-        print(f"[FN] Sample {i:03d} | Score={decision_scores[i]:.6f}")
+    # ====================================================
+    # CONFUSION MATRIX COMPONENTS
+    # ====================================================
+
+    TP = np.sum((preds == 1) & (y_test == 1))
+    FP = np.sum((preds == 1) & (y_test == 0))
+    TN = np.sum((preds == 0) & (y_test == 0))
+    FN = np.sum((preds == 0) & (y_test == 1))
+
+    print("\n==============================")
+    print("CONFUSION MATRIX SUMMARY")
+    print("==============================")
+    print(f"True Positives  (TP): {TP}")
+    print(f"False Positives (FP): {FP}")
+    print(f"True Negatives  (TN): {TN}")
+    print(f"False Negatives (FN): {FN}")
 
 
-# ====================================================
-# OPTIONAL: ACCURACY
-# ====================================================
+    # ====================================================
+    # DETECTED ANOMALIES (CORRECT)
+    # ====================================================
 
-accuracy = (preds == y_test).mean()
-print("\nAccuracy:", accuracy)
+    print("\n==============================")
+    print("DETECTED ANOMALIES (TP)")
+    print("==============================")
+
+    for i in range(len(y_test)):
+        if preds[i] == 1 and y_test[i] == 1:
+            print(f"[TP] Sample {i:03d} | Score={decision_scores[i]:.6f}")
+
+
+    # ====================================================
+    # FALSE ALARMS (FP)
+    # ====================================================
+
+    print("\n==============================")
+    print("FALSE POSITIVES (Normal flagged as anomaly)")
+    print("==============================")
+
+    for i in range(len(y_test)):
+        if preds[i] == 1 and y_test[i] == 0:
+            print(f"[FP] Sample {i:03d} | Score={decision_scores[i]:.6f}")
+
+
+    # ====================================================
+    # MISSED ANOMALIES (FN)
+    # ====================================================
+
+    print("\n==============================")
+    print("MISSED ANOMALIES (FN)")
+    print("==============================")
+
+    for i in range(len(y_test)):
+        if preds[i] == 0 and y_test[i] == 1:
+            print(f"[FN] Sample {i:03d} | Score={decision_scores[i]:.6f}")
+
+
+    # ====================================================
+    # OPTIONAL: ACCURACY
+    # ====================================================
+
+    accuracy = (preds == y_test).mean()
+    print("\nAccuracy:", accuracy)
+
+if __name__ == "__main__":
+    main()
