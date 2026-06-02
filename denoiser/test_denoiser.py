@@ -9,6 +9,7 @@ reporting reconstruction metrics.
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 
 import torch
 import torch.nn.functional as F
@@ -16,19 +17,25 @@ from PIL import Image
 from torch.utils.data import DataLoader, TensorDataset
 from torchmetrics.image import StructuralSimilarityIndexMeasure
 
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from data.NWPU.dataset_generator import create_anomaly_dataset
 from classical_denoiser import Denoiser, FullDenoiser
 from noisy_filter import add_haze
 
 
-ORIGINAL_OUTPUT_DIR = Path("denoiser/original_images")
-NOISY_OUTPUT_DIR = Path("denoiser/noisy_images")
-DENOISED_OUTPUT_DIR = Path("denoiser/denoised_images")
-MODEL_OUTPUT_PATH = Path("denoiser/denoiser_model.pt")
+ORIGINAL_OUTPUT_DIR = REPO_ROOT / "denoiser" / "original_images"
+NOISY_OUTPUT_DIR = REPO_ROOT / "denoiser" / "noisy_images"
+DENOISED_OUTPUT_DIR = REPO_ROOT / "denoiser" / "denoised_images"
+MODEL_OUTPUT_PATH = REPO_ROOT / "denoiser" / "denoiser_model.pt"
 
 BATCH_SIZE = 32
 EPOCHS = 100
 LEARNING_RATE = 1e-3
+NUM_SAMPLES = 400
 
 
 def save_image_references(
@@ -352,7 +359,10 @@ def print_summary(
 
 def main() -> None:
     """Runs the full denoiser training, export, and evaluation workflow."""
-    clean_train_dataset, clean_test_dataset = create_anomaly_dataset(normalize=False)
+    clean_train_dataset, clean_test_dataset = create_anomaly_dataset(
+        num_samples=NUM_SAMPLES,
+        normalize=False,
+    )
 
     clean_train_images, train_anomaly_labels, train_photo_type_labels = (
         clean_train_dataset
